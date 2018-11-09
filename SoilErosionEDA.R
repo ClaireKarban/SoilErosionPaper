@@ -114,8 +114,30 @@ ggplot(data=WMSilt_dat) +
   geom_histogram(mapping = aes(x=log_Silt_Erosion), bins=50) #Not looking great
 
 #Now look at split up by year
-ggplot(data=SMBSNE_dat) +
-  geom_histogram(mapping = aes(x=log_BSNE_gM2day, fill=Treatment_Year), position="identity",
-                 bins=50, alpha=0.5) 
+ggplot(data=WMSilt_dat) +
+  geom_histogram(mapping = aes(x=Silt_Erosion, fill=Treatment_Year), position="identity",
+                 bins=50, alpha=0.5) +
+  facet_wrap(facets = ~Treatment_Year)
 
+ggplot(data=SMSilt_dat) +
+  geom_histogram(mapping = aes(x=Silt_Erosion, fill=Treatment_Year), position="identity",
+                 bins=50, alpha=0.5) +
+  facet_wrap(facets = ~Treatment_Year) #There does appear to be slightly more erosion in year 
+
+#Before I split the data up by site, are there any differences between Year versus Treatment_year?
+ggplot(data=erosion_dat) +
+  geom_point(mapping = aes(x=Silt_Erosion, fill=Treatment_Year), position="identity",
+                 bins=50, alpha=0.5) +
+  facet_wrap(facets = ~Year) 
+
+
+ggplot(data=BSNE_dat) +
+  geom_point(mapping = aes(x=Year, y=BSNE_gM2day, col=Site), position="jitter") +
+  labs(x="Year",y="Wind Erosion (g/M2/day)")
+  #This is a nice graph showing that Treatment year and site look much more influential on wind erosion than Year.
+
+ggplot(data=erosion_dat) +
+  geom_point(mapping = aes(x=Year, y=Silt_Erosion, col=Site), position="jitter") +
+  labs(x="Year",y="Water Erosion (g/M2)")
+#Notes: Shay has more wind and water erosion than Wray, so the effect of year 1 versus year 2 is more dramatic at Shay.
 
