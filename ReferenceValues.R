@@ -7,8 +7,6 @@ SMmeanSoilCover <- aggregate(SM[, 15:27], list(SM$Site), mean)
 
 
 SM <- subset(reference_dat, Site == "SM")
-library(dplyr)
-SM %>% summarise_each(funs(mean))
 str(SM)
 
 colMeans(SM[sapply(SM, is.character)])
