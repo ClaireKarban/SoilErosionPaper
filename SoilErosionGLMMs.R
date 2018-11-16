@@ -30,6 +30,9 @@ str(BSNE_dat)
 SMBSNE_dat <- subset(BSNE_dat, Site=="SM") #Create new data sets by site so I run sepearate models by site
 WMBSNE_dat <- subset(BSNE_dat, Site=="WM")
 
+SMSilt_dat <- subset(erosion_dat, Site=="SM") #Create new data sets by site so I run sepearate models by site
+WMSilt_dat <- subset(erosion_dat, Site=="WM")
+
 #Remove NAs from Chla data for the Silt_erosion analysis
 erosion_dat <- erosion_dat %>%
   filter(Chla != "NA")
@@ -134,3 +137,22 @@ samplesdf.BSM <- data.frame(samples.BSM$alpha,samples.BSM$beta)
 names(samplesdf.BSM) <- c("alpha",paste(names(samples.BSM[2]),1:5,sep="_"))
 samplesdf.BSM
 
+vcov(bysfitWind.WM,correlation=TRUE)
+samplesWM <- extract(bysfitWind.WM$stanfit)
+samplesdf.WM <- data.frame(samplesWM$alpha,samplesWM$beta)
+names(samplesdf.WM) <- c("alpha",paste(names(samplesWM[2]),1:5,sep="_"))
+samplesdf.WM
+
+launch_shinystan(bysfitWind.SM) #I'm worried this is too messy
+launch_shinystan(bysfitWind.WM) #I think this looks good
+
+##Trying these models for Water Erosion
+bysfitWater <- stan_glmer(log(Silt_Erosion+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Site/Seeding/Treatment/Transect),
+                           data=erosion_dat)
+launch_shinystan(bysfitWater) 
+
+
+bysfitWind.SM <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
+                            data=SMBSNE_dat)
+bysfitWind.WM <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
+                            data=WMBSNE_dat)
