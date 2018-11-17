@@ -128,8 +128,18 @@ launch_shinystan(bysfitWind.2)
 #Now, run the Wind erosion models separated by site
 bysfitWind.SM <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
                            data=SMBSNE_dat)
-bysfitWind.WM <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
-                            data=WMBSNE_dat)
+
+bysfitWind.SM2 <- stan_glmer(BSNE_gM2day+.01 ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
+                            family=gaussian (link= "log" ), data=SMBSNE_dat)
+
+bysfitWind.WM <- stan_glmer((BSNE_gM2day+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
+                            family=gaussian (link= "log" ), data=WMBSNE_dat) #running this with the link function makes it way slower
+launch_shinystan(bysfitWind.WM)
+
+bysfitWind.WM2 <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
+                            family=gaussian (link= "log" ), data=WMBSNE_dat)
+
+
 
 vcov(bysfitWind.SM,correlation=TRUE)
 samples.BSM <- extract(bysfitWind.SM$stanfit)
@@ -146,6 +156,40 @@ samplesdf.WM
 launch_shinystan(bysfitWind.SM) #I'm worried this is too messy
 launch_shinystan(bysfitWind.WM) #I think this looks good
 
+###Trying to graph Wind erosion ~ chl a, faceted by site
+newd <- data.frame(BSNE_gM2day = rep(seq(min(BSNE_dat$BSNE_gM2day), max(BSNE_dat$BSNE_gM2day), 
+                                      length.out=50),2),
+                   Site = factor(rep(c("WM","SM"),each=100)))
+
+pmu <- posterior_linpred(bysfitWind, transform = TRUE, newdata = newd)
+mnmu <- colMeans(pmu)
+regression_intervals <- t(apply(pmu,2,hpdi))
+colnames(regression_intervals) <- c("mulo95","muhi95")
+ppd <- posterior_predict(bysfitWind, newdata = newd)
+prediction_intervals <- t(apply(ppd,2,quantile,prob=c(0.025,0.975)))
+colnames(prediction_intervals) <- c("ppdlo95","ppdhi95")
+
+mcpreds_df <- cbind(newd,mnmu,regression_intervals,prediction_intervals)
+mcpreds_df
+ggplot() +
+  geom_ribbon(mapping=aes(x=BSNE_gM2day,ymin=mulo95,ymax=muhi95,fill=Site),
+              alpha=0.2,show.legend=FALSE,data=mcpreds_df) +
+  geom_point(mapping=aes(x=BSNE_gM2day,y=Chla,col=Site),
+             show.legend=FALSE,data=BSNE_dat) +
+  geom_line(mapping=aes(x=BSNE_gM2day,y=mnmu,col=Site),
+            show.legend=FALSE,data=mcpreds_df) +
+  geom_line(mapping=aes(x=BSNE_gM2day,y=ppdlo95,col=Site),lty=2,
+            show.legend=FALSE,data=mcpreds_df) +
+  geom_line(mapping=aes(x=BSNE_gM2day,y=ppdhi95,col=Site),lty=2,
+            show.legend=FALSE,data=mcpreds_df)
+  #geom_text(mapping=aes(x=42.9,y=3.3,label="Bog"),col="#d95f02") +
+  #geom_text(mapping=aes(x=43.85,y=9.5,label="Forest"),col="#1b9e77") +
+  #scale_fill_manual(values = c("#d95f02","#1b9e77")) +
+  #scale_color_manual(values = c("#d95f02","#1b9e77")) +
+  #ylim(0,20) +
+  #xlab("Latitude (degrees north)") +
+  #ylab("Ant species richness")
+
 ##Trying these models for Water Erosion
 bysfitWater <- stan_glmer(log(Silt_Erosion+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Site/Seeding/Treatment/Transect),
                            data=erosion_dat)
@@ -156,3 +200,9 @@ bysfitWind.SM <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year + VegCover + M
                             data=SMBSNE_dat)
 bysfitWind.WM <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
                             data=WMBSNE_dat)
+
+
+launch_shinystan(bysfitWind.SM)
+launch_shinystan(bysfitWind.WM)
+plot(bysfitWind.SM)
+plot(bysfitWind.WM)
