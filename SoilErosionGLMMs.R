@@ -139,7 +139,7 @@ launch_shinystan(bysfitWind.WM)
 bysfitWind.WM2 <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
                             family=gaussian (link= "log" ), data=WMBSNE_dat)
 
-
+summary(bysfitWind)
 
 vcov(bysfitWind.SM,correlation=TRUE)
 samples.BSM <- extract(bysfitWind.SM$stanfit)
@@ -156,39 +156,9 @@ samplesdf.WM
 launch_shinystan(bysfitWind.SM) #I'm worried this is too messy
 launch_shinystan(bysfitWind.WM) #I think this looks good
 
-###Trying to graph Wind erosion ~ chl a, faceted by site
-newd <- data.frame(BSNE_gM2day = rep(seq(min(BSNE_dat$BSNE_gM2day), max(BSNE_dat$BSNE_gM2day), 
-                                      length.out=50),2),
-                   Site = factor(rep(c("WM","SM"),each=100)))
-
-pmu <- posterior_linpred(bysfitWind, transform = TRUE, newdata = newd)
-mnmu <- colMeans(pmu)
-regression_intervals <- t(apply(pmu,2,hpdi))
-colnames(regression_intervals) <- c("mulo95","muhi95")
-ppd <- posterior_predict(bysfitWind, newdata = newd)
-prediction_intervals <- t(apply(ppd,2,quantile,prob=c(0.025,0.975)))
-colnames(prediction_intervals) <- c("ppdlo95","ppdhi95")
-
-mcpreds_df <- cbind(newd,mnmu,regression_intervals,prediction_intervals)
-mcpreds_df
-ggplot() +
-  geom_ribbon(mapping=aes(x=BSNE_gM2day,ymin=mulo95,ymax=muhi95,fill=Site),
-              alpha=0.2,show.legend=FALSE,data=mcpreds_df) +
-  geom_point(mapping=aes(x=BSNE_gM2day,y=Chla,col=Site),
-             show.legend=FALSE,data=BSNE_dat) +
-  geom_line(mapping=aes(x=BSNE_gM2day,y=mnmu,col=Site),
-            show.legend=FALSE,data=mcpreds_df) +
-  geom_line(mapping=aes(x=BSNE_gM2day,y=ppdlo95,col=Site),lty=2,
-            show.legend=FALSE,data=mcpreds_df) +
-  geom_line(mapping=aes(x=BSNE_gM2day,y=ppdhi95,col=Site),lty=2,
-            show.legend=FALSE,data=mcpreds_df)
-  #geom_text(mapping=aes(x=42.9,y=3.3,label="Bog"),col="#d95f02") +
-  #geom_text(mapping=aes(x=43.85,y=9.5,label="Forest"),col="#1b9e77") +
-  #scale_fill_manual(values = c("#d95f02","#1b9e77")) +
-  #scale_color_manual(values = c("#d95f02","#1b9e77")) +
-  #ylim(0,20) +
-  #xlab("Latitude (degrees north)") +
-  #ylab("Ant species richness")
+#Re-run models with insignificant predictors removed. 
+bysfitWind.SM3 <- stan_glmer(log(BSNE_gM2day+.01) ~ Treatment_Year +  Median_SoilStability + Soil + Chla + (1|Seeding/Treatment/Transect),
+                            data=SMBSNE_dat)
 
 ##Trying these models for Water Erosion
 bysfitWater <- stan_glmer(log(Silt_Erosion+.01) ~ Treatment_Year + VegCover + Median_SoilStability + Soil + Chla + (1|Site/Seeding/Treatment/Transect),
@@ -206,3 +176,116 @@ launch_shinystan(bysfitWind.SM)
 launch_shinystan(bysfitWind.WM)
 plot(bysfitWind.SM)
 plot(bysfitWind.WM)
+
+
+
+
+
+
+
+###Currently *failing* attempt to graph Wind erosion ~ chl a, faceted by site
+newd <- data.frame(BSNE_gM2day = rep(seq(min(log(BSNE_dat$BSNE_gM2day + .01)), max(log(BSNE_dat$BSNE_gM2day +.01), length.out=50),6)),
+                   Site = factor(rep(c("WM","SM"), 150)),
+                   Treatment_Year = factor(rep(c("1","2"),150)),
+                   VegCover = rep(seq(min(BSNE_dat$VegCover), max(BSNE_dat$VegCover), 
+                                      length.out=50),6),
+                   Median_SoilStability = factor(rep(c("1","2","3","4","5","6"), 50)),
+                   Soil = rep(seq(min(BSNE_dat$Soil), max(BSNE_dat$Soil), length.out=50),6),
+                   Chla = rep(seq(min(BSNE_dat$Chla), max(BSNE_dat$Chla), length.out=50),6),
+                   Seeding = factor(rep(c("S","U"),150)),
+                   Treatment = factor(rep(c("C","L","P","B"),75)),
+                   Transect = factor(rep(c("1","2","3","4","5","6","7","8","9","10"), 30)))
+
+pmu <- posterior_linpred(bysfitWind, transform=TRUE, newdata = newd)
+mnmu <- colMeans(pmu)
+regression_intervals <- t(apply(pmu,2,hpdi))
+colnames(regression_intervals) <- c("mulo95","muhi95")
+ppd <- posterior_predict(bysfitWind, newdata = newd)
+prediction_intervals <- t(apply(ppd,2,quantile,prob=c(0.025,0.975)))
+colnames(prediction_intervals) <- c("ppdlo95","ppdhi95")
+
+mcpreds_df <- cbind(newd,mnmu,regression_intervals,prediction_intervals)
+mcpreds_df
+
+mcpreds_df <- mcpreds_df %>% 
+  mutate( "LogBSNE_gM2day" = log(BSNE_gM2day+.01))
+mcpreds_df <- mcpreds_df %>%
+  filter(LogBSNE_gM2day != "NaN")
+
+
+str(BSNE_dat)
+head(BSNE_dat)
+summary(BSNE_dat)
+
+ggplot() +
+  geom_ribbon(mapping=aes(x=LogBSNE_gM2day,ymin=mulo95,ymax=muhi95,fill=Site),
+              alpha=0.2,show.legend=FALSE,data=BSNE_dat) + 
+  geom_point(mapping=aes(x=log(BSNE_gM2day+.01),y=Chla,col=Site),
+             show.legend=FALSE,data=BSNE_dat) +
+  geom_line(mapping=aes(x=LogBSNE_gM2day,y=mnmu,col=Site),
+            show.legend=FALSE,data=BSNE_dat) +
+  geom_line(mapping=aes(x=LogBSNE_gM2day,y=ppdlo95,col=Site),lty=2,
+            show.legend=FALSE,data=BSNE_dat) +
+  geom_line(mapping=aes(x=LogBSNE_gM2day,y=ppdhi95,col=Site),lty=2,
+            show.legend=FALSE,data=BSNE_dat) +
+  scale_fill_manual(values = c("#d95f02","#1b9e77")) +
+  scale_color_manual(values = c("#d95f02","#1b9e77")) +
+  ylim(-1,6) 
+
+
+p_linpread <- ggplot(msleep) + 
+  aes(x = log_brainwt) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), data = df_pred_lin, 
+              alpha = 0.4, fill = "grey60") + 
+  geom_line(aes(y = median), data = df_pred_lin, colour = "#3366FF", size = 1) + 
+  geom_point(aes(y = log_sleep_total)) + 
+  scale_x_continuous(labels = function(x) 10 ^ x) +
+  labs(x = lab_lines$brain_log, y = lab_lines$sleep_log)
+p_linpread
+
+
+
+geom_ribbon(mapping=aes(x=log(BSNE_gM2day+.01),ymin=mulo95,ymax=muhi95,fill=Site),
+            alpha=0.2,show.legend=FALSE,data=mcpreds_df) +
+             show.legend=TRUE,data=BSNE_dat)+
+  geom_line(mapping=aes(x=BSNE_gM2day,y=mnmu,col=Site),
+            show.legend=FALSE, stat="smooth", data=mcpreds_df) +
+  stat_smooth(method="identity") +
+  ylim(-1,6) 
+
++
+  geom_line(mapping=aes(x=BSNE_gM2day,y=mnmu,col=Site),
+            show.legend=FALSE,data=mcpreds_df) +
+  geom_smooth(mapping=aes(x=log(BSNE_gM2day+.01),y=mnmu,col=Site),
+              show.legend=FALSE,data=mcpreds_df, method = "bysfitWind") +
+  ylim(-1,6) 
+
+geom_ribbon(mapping=aes(x=log(BSNE_gM2day+.01),ymin=mulo95,ymax=muhi95,fill=Site),
+            alpha=0.2,show.legend=FALSE,data=mcpreds_df) +
+  geom_point(mapping=aes(x=log(BSNE_gM2day+.01),y=Chla,col=Site),
+             show.legend=TRUE,data=BSNE_dat) +
+  geom_smooth(mapping=aes(x=log(BSNE_gM2day+.01),y=mnmu,col=Site),
+              show.legend=FALSE,data=mcpreds_df, method = "bysfitWind") +
+  ylim(-1,6) 
+
+
+ggplot(data,aes(x.plot,y.plot))+stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm')
+
+ggplot() +
+  geom_point(mapping=aes(x=log(BSNE_gM2day+.01), y=Chla),
+             show.legend=FALSE,data=BSNE_dat)
+
+ggplot() +
+  geom_point(mapping=aes(x=BSNE_gM2day, y=Chla),
+             show.legend=FALSE,data=mcpreds_df)
+
+
+#geom_text(mapping=aes(x=42.9,y=3.3,label="Bog"),col="#d95f02") +
+#geom_text(mapping=aes(x=43.85,y=9.5,label="Forest"),col="#1b9e77") +
+#scale_fill_manual(values = c("#d95f02","#1b9e77")) +
+#scale_color_manual(values = c("#d95f02","#1b9e77")) +
+#ylim(0,20) +
+#xlab("Latitude (degrees north)") +
+#ylab("Ant species richness")
+
