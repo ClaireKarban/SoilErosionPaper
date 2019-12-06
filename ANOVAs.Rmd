@@ -1,0 +1,179 @@
+---
+title: "ANOVAs for Soil Erosion Paper"
+author: "Claire Karban"
+date: "12/5/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+This script provides chunks to organize and clean the data, run ANOVAs, and produce graphs of the results 
+
+
+# All libraries used in the script
+```{r libraries}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggfortify)
+library(viridis)
+library(hrbrthemes)
+library(forcats)
+library(apaTables)
+```
+
+# Set working directory and import data
+```{r}
+setwd("~/Documents/Current Projects/SoilErosionPaper")
+fullbnsedata <- read.csv("Fall-2019-Analysis/BSNEdata.csv")
+fullsiltdata <- read.csv("Fall-2019-Analysis/siltdata.csv")
+```
+
+
+# Subset data
+```{r}
+# Select columns
+siltdata <- fullsiltdata %>%
+      select(Site, Treatment, Seeding, Transect, silt_gday)
+bsnedata <- fullbnsedata %>%
+      select(Site, Treatment, Seeding, Transect, BSNE_gM2day )
+
+# Relevel the treatment columns
+# this is so that the Control is listed first
+siltdata <- mutate(siltdata, Treatment = relevel(Treatment, ref = "Control"))
+bsnedata <- mutate(bsnedata, Treatment = relevel(Treatment, ref = "Control"))
+# Filter out N/As
+#siltdata <- siltdata %>%
+  #filter(Silt_Erosion != "#N/A") %>%
+  #mutate(Silt_Erosion = as.numeric(Silt_Erosion))
+#bsnedata <- bsnedata %>%
+  #filter(BSNE_gM2day != "#N/A")%>%
+  #mutate(BSNE_gM2day = as.numeric(BSNE_gM2day))
+
+# Calculate fluxes by treatment
+#siltdata = siltdata %>%
+    #mutate(ID2 = paste(Site, Treatment, Seeding, Transect, sep = '_')) %>%
+    #group_by(ID2, Site, Treatment, Seeding) %>%
+    #summarise(total_siltflux = sum(Silt_Erosion)/2)
+
+#bsnedata = bsnedata %>%
+    #mutate(ID2 = paste(Site, Treatment, Seeding, Transect, sep = '_')) %>%
+    #group_by(ID2, Site, Treatment, Seeding) %>%
+    #summarise(total_bsneflux = sum(BSNE_gM2day)/2)
+
+# Split data by site
+siltdataWM <- siltdata %>%
+  filter(Site == "Wray Mesa")
+siltdataSM <- siltdata %>%
+  filter(Site == "Shay Mesa")
+
+bsnedataWM <- bsnedata %>%
+  filter(Site == "Wray Mesa")
+bsnedataSM <- bsnedata %>%
+  filter(Site == "Shay Mesa")
+```
+
+
+# Examine normality of data
+```{r Data Checking}
+# Examine data
+hist(siltdataSM$silt_gday)
+hist(siltdataWM$silt_gday)
+hist(bsnedataSM$BSNE_gM2day)
+hist(bsnedataWM$BSNE_gM2day)
+
+ggplot(data=siltdata, aes(x=Treatment, y=silt_gday, fill=Site)) + 
+    geom_bar(stat="identity", position=position_dodge())
+
+ggplot(data=bsnedata, aes(x=Treatment, y=BSNE_gM2day, fill=Site)) + 
+    geom_bar(stat="identity", position=position_dodge())
+
+
+# Run ANOVA
+model_siltSM <- aov(log(silt_gday) ~ Treatment, data = siltdataSM)
+summary(model_siltSM)
+TukeyHSD(model_siltSM)
+
+# The interaction was not significant so I've chosen an additive model
+model_siltWM <- aov(log(silt_gday) ~ Treatment + Seeding, data = siltdataWM)
+summary(model_siltWM)
+TukeyHSD(model_siltWM)
+
+# check model assumptions
+autoplot(model_siltSM, smooth.colour = NA)
+autoplot(model_siltWM, smooth.colour = NA)
+
+# Run ANOVA
+model_bsneSM <- aov(log(BSNE_gM2day) ~ Treatment, data = bsnedataSM)
+summary(model_bsneSM)
+TukeyHSD(model_bsneSM)
+
+# The interaction was not significant so I've chosen an additive model
+model_bsneWM <- aov(log(BSNE_gM2day) ~ Treatment + Seeding, data = bsnedataWM)
+summary(model_bsneWM)
+TukeyHSD(model_bsneWM)
+
+# check model assumptions
+autoplot(model_bsneSM, smooth.colour = NA)
+autoplot(model_bsneWM, smooth.colour = NA)
+
+# Create results tables
+apa.aov.table(model_siltSM, filename = "Table1_SiltSM.doc", table.number = 1)
+apa.aov.table(model_siltWM, filename = "Table2_SiltWM.doc", table.number = 2)
+apa.aov.table(model_bsneSM, filename = "Table3_BSNESM.doc", table.number = 3)
+apa.aov.table(model_bsneWM, filename = "Table4_BSNEWM.doc", table.number = 4)
+```
+
+# Make bar graphs to show results
+```{r Figures, echo=FALSE}
+# Calculate SE bars for Silt data
+sumSilt <- siltdata %>% 
+  group_by(Site, Treatment, Seeding) %>% 
+  summarise(meanSilt = mean(silt_gday), seSilt = sd(silt_gday)/sqrt(n()))
+
+sumBSNE <- bsnedata %>% 
+  group_by(Site, Treatment, Seeding) %>% 
+  summarise(meanBSNE = mean(BSNE_gM2day), seBSNE = sd(BSNE_gM2day)/sqrt(n()))
+
+# Figure for Silt Fence
+silt_plot <- ggplot(sumSilt, aes(fill=Seeding, y=meanSilt, x=fct_infreq(factor(Treatment)))) + 
+    geom_bar(position="dodge", stat="identity") +
+    scale_fill_viridis(discrete = T, option = "E") +
+    ggtitle("Erosional Fluxes Measured at Silt Fences") +
+    geom_errorbar(aes(ymin = meanSilt - seSilt, ymax = meanSilt + seSilt), width=.1,position=position_dodge(.9)) + 
+    facet_wrap(~Site) +
+    theme_ipsum(base_size = 13) +
+    theme(legend.position=c(0.95, 0.8)) +
+    theme(axis.text.x = element_text(angle = 90)) +
+    theme(axis.title.y = element_text(size = rel(1.5))) +
+    theme(axis.title.x = element_text(size = rel(1.5))) +
+    xlab("") + 
+    ylab("Sediment Flux (g/day)")
+silt_plot
+
+
+bsne_plot <- ggplot(sumBSNE, aes(fill=Seeding, y=meanBSNE, x=fct_infreq(factor(Treatment)))) + 
+    geom_bar(position="dodge", stat="identity") +
+    scale_fill_viridis(discrete = T, option = "E") +
+    ggtitle("Erosional Fluxes Measured at BSNE") +
+    geom_errorbar(aes(ymin = meanBSNE - seBSNE, ymax = meanBSNE + seBSNE), width=.1,position=position_dodge(.9)) + 
+    facet_wrap(~Site) +
+    theme_ipsum(base_size = 13) +
+    theme(legend.position=c(0.95, 0.8)) +
+    theme(axis.text.x = element_text(angle = 90)) +
+    theme(axis.title.y = element_text(size = rel(1.5))) +
+    theme(axis.title.x = element_text(size = rel(1.5))) +
+    xlab("") + 
+    ylab(expression(Anthropogenic~SO[4]^{"2-"}~(ngm^-3))) + 
+    ylab(expression(Sediment~Flux~(g/M^2/day)))
+bsne_plot
+
+
+```
+
